@@ -1,6 +1,6 @@
 # Normalized Effort-to-Compress for MATLAB
 
-Pure MATLAB implementation of Effort-to-Compress (ETC), nETC, and cETC. No MEX compilation or additional toolboxes are required.
+MATLAB implementation of Effort-to-Compress (ETC), nETC, and cETC. 
 
 ## Usage
 
