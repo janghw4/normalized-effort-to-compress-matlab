@@ -1,6 +1,6 @@
 # Normalized Effort-to-Compress for MATLAB
 
-Pure MATLAB implementation of Effort-to-Compress (ETC). No MEX compilation or additional toolboxes are required.
+Pure MATLAB implementation of Effort-to-Compress (ETC), nETC, and cETC. No MEX compilation or additional toolboxes are required.
 
 ## Usage
 
@@ -12,7 +12,6 @@ addpath('/path/to/normalized-effort-to-compress-matlab')
 compute_etc([0 1 0 1])   % 1: one substitution gives [2 2]
 compute_etc([7 7 7])     % 0: already constant
 compute_etc([0 1 2])     % 2
-example_etc
 ```
 
 `compute_etc` accepts row or column vectors of finite integer labels, including negative labels. It returns the number of pair substitutions needed to reach a constant sequence. The API returns zero for empty input.
@@ -20,35 +19,30 @@ example_etc
 ## Normalization
 
 ```matlab
-value = normalize_etc(etc, lower_bound, reference_mean);
+sequence = [0 0 0 1 0 1 0 0 1 0];
+n = nETC(sequence);
+c = cETC(sequence);
+
+% Optional: 1,000 reference samples and a reproducible seed.
+[n, global_info] = nETC(sequence, 1000, 42);
+[c, composition_info] = cETC(sequence, 1000, 42);
 ```
 
-This computes `(etc - lower_bound) / (reference_mean - lower_bound)`. Supply the certified global lower bound and matching global ensemble mean for nETC. For cETC, supply the corresponding anchors conditioned on the ordered symbol-count vector. Reference means must be estimated separately.
+Each function computes raw ETC, its certified lower bound, and a Monte Carlo reference mean. The result is `(ETC - lower_bound) / (reference_mean - lower_bound)`. The default is 200 reference samples. With a seed, the functions use a local random stream and leave MATLAB's global random state unchanged. Without a seed, they use the global stream.
 
-The reference mean must exceed the lower bound. Values above one are retained.
+`nETC` draws uniformly from sequences with the same length and observed alphabet size, requiring every symbol to appear. It uses rejection sampling when acceptance is high and a completion-count sampler otherwise. `cETC` uniformly shuffles the observed sequence, preserving the count associated with each numerical label.
+
+For length `L` and alphabet size `k`, the global lower bound is `k - 1 + ceil(log2(L/(k*M)))`, where `M` is the largest divisor of `L` not exceeding `floor(L/k)`. The composition-conditioned bound replaces `M` with the greatest common divisor of the observed symbol counts. Both are evaluated by integer doubling to avoid rounding at powers of two.
+
+The optional second output includes `raw_etc`, `lower_bound`, `reference_mean`, `reference_sd`, `reference_mcse`, the individual `reference_etc` values, and the ordered `symbols` and `counts`.
+
+Normalization requires `2 <= k <= L-2`. Constant sequences and the boundaries `k = L-1` and `k = L` have zero reference denominators. If a finite sample also gives a zero denominator, the function reports an error so the sample count can be increased. Values above one are retained.
 
 ## Substitution rules
 
 Pairs are counted without overlap in a left-to-right scan. Ties are resolved by the smallest second label, then the smallest first label. Each substitution uses a fresh label larger than all existing labels. The algorithm checks for an exactly constant sequence before counting pairs. When the maximum pair frequency is one, it adds the current length minus one to the count and returns.
 
 Original labels are mapped to ascending ranks. Their numerical order and the count associated with each label are preserved. Pair counts use a sparse matrix.
-
-## Tests
-
-```matlab
-addpath('tests')
-run_tests
-```
-
-Tests compare with an explicit pair-by-pair MATLAB implementation and saved results from the [C implementation](https://github.com/janghw4/normalized-effort-to-compress). The tests cover all binary sequences through length 12, all ternary sequences through length 8, random sequences, sparse labels, row and column inputs, and invalid inputs.
-
-Verified on MATLAB R2024b Update 6: 18,255 oracle comparisons and 120 C comparisons passed.
-
-The C fixture can be regenerated with Python and a compiled C library:
-
-```sh
-python tests/generate_c_cases.py /path/to/libetc.so
-```
 
 ## References
 
